@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Browser Text Editor</title>
+	<style type="text/css">
+		#tabBanner {
+			width: 100%;
+		}
+		#newTabButton {
+			border: 0px;
+		}
+		#recoverButton {
+			float: right;
+		}
+		.fieldBox {
+			margin: 0px 10px 0px 10px;
+		}
+		.fieldBoxLabel {
+			margin: 0px 3px 0px 0px;
+		}
+	</style>
+	<script type="text/javascript">
+		/** Allows the user to manipulate files in plaintext.
+		 * @author Josh M
+		*/
+		
+		/*
+		This is an array containing all the content types (example: text/plain), their extension (example: txt), and their purpose (example: Plaintext)
+		If the second attribute is blank (""), the file extension will not be changed when the option is selected.
+		You change this list own if you want
+		*/
+		const contentTypes = [
+			["text/plain", "txt", "Plaintext"],
+			["text/html", "html", "HTML"],
+			["text/css", "css", "CSS"],
+			["text/richtext", "rtf", "Rich Text Document"],
+			["text/csv", "csv", "CSV"],
+			["application/javascript", "js", "JavaScript"],
+			["application/json", "json", "JSON"],
+			["application/xml", "xml", "XML"],
+			["application/zip", "zip", "ZIP"],
+			["application/pdf", "pdf", "PDF"],
+			["application/sql", "sql", "SQL"],
+			["application/octect-stream", null, "application/octet-stream"]
+		];
+		
+		// These are the default values for the fields on the page; you can change them if you want
+		var defaultName = "file.txt";
+		var defaultContentType = "";
+		var defaultContent = "";
+		
+		var tabsOpen = 0; // Start with 0 tabs; a tab will be created when <body> finishes loading
+		var currentTab;
+		
+		var nameFieldValues = [];
+		var contentTypeFieldValues = [];
+		var contentFieldValues = [];
+		var saveHistories = [];
+		
+		
+		function setArraysAccordingToFields(tabNum)
+		{
+			// Allows no parameters to given and defaults to the current tab; if current tab is undefined, defaults to 0
+			if (tabNum == undefined)
+			{
+				if (currentTab == undefined)
+					tabNum = 0;
+				else
+					tabNum = currentTab;
+			}
+			
+			nameFieldValues[tabNum] = document.getElementById("nameField").value;
+			contentTypeFieldValues[tabNum] = document.getElementById("contentTypeField").value;
+			contentFieldValues[tabNum] = document.getElementById("contentField").value;
+			
+			// Change file name shown on the tab button
+			document.getElementById("tabButton" + tabNum.toString()).value = nameFieldValues[tabNum];
+		}
+		
+		function setFieldsAccordingToArrays(tabNum)
+		{
+			// Allows no parameters to given, defaults to the current tab. If currentTab is undefined, defaults to tab 0
+			if (tabNum == undefined)
+			{
+				if (currentTab == undefined)
+					tabNum = 0;
+				else
+					tabNum = currentTab;
+			}
+			
+			// This part actually sets the fields according to the arrays
+			document.getElementById("nameField").value = nameFieldValues[tabNum];
+			document.getElementById("contentTypeField").value = contentTypeFieldValues[tabNum];
+			document.getElementById("contentField").value = contentFieldValues[tabNum];
+		}
+		
+		function setContentTypeAccordingToDropdown(tabNum)
+		{
+			// Allows no parameters to given, defaults to the current tab. If currentTab is undefined, defaults to tab 0
+			if (tabNum == undefined)
+			{
+				if (currentTab == undefined)
+					tabNum = 0;
+				else
+					tabNum = currentTab;
+			}
+			
+			// Save any changes the user might have made to the file (content, name, etc.) 
+			if (tabNum == currentTab)
+			{
+				setArraysAccordingToFields(tabNum);
+			}
+			
+			// Update the content type
+			if (document.getElementById("contentTypeSelector").value != undefined)
+			{
+				contentTypeFieldValues[tabNum] = document.getElementById("contentTypeSelector").value;
+			}
+			
+			// If the content type was changed for the current tab, update the fields. If the fields aren't updated now, they will be updated later when the user switches to that tab
+			if (tabNum == currentTab)
+			{
+				setFieldsAccordingToArrays(tabNum);
+			}
+			
+			// Set the file extension based on the appropriate value for the selected content type
+			var fullFileName = document.getElementById("nameField").value;
+			var cleanFullFileName = ""; // Fixed version of full file name (no double dots, no trailing dots)
+			var newFullFileName = ""; // Final version of full file name, including the new extension
+			var lastChar;
+			for (var i = (fullFileName.length - 1); i >= 0; i--) // This for loop goes backwards (from the end of the full file name to the beginning of it)
+			{
+				if ((cleanFullFileName == "") && (fullFileName.charAt(i) == '.')) // Exclude trailing dots
+				{}
+				else if ((lastChar == '.') && (fullFileName.charAt(i) == '.'))
+				{}
+				else
+				{
+					cleanFullFileName = fullFileName.charAt(i) + cleanFullFileName;
+				}
+				
+				lastChar = fullFileName.charAt(i);
+			}
+			
+			// Scan through all the known content types to see which one matches
+			var newFileExtension;
+			for (var i = 0; i < contentTypes.length; i++)
+			{
+				if (contentTypes[i][0] == document.getElementById("contentTypeSelector").value) // If the value of contentTypeField matches the first entry of whatever content type is being tested for, append a dot and the corresponding extension to the full file name
+					newFileExtension =  contentTypes[i][1];
+			}
+			
+			if (newFileExtension != null)
+			{
+				// Find last dot in clean full file name
+				var positionOfLastDot;
+				for (var i = (cleanFullFileName.length - 1); i >= 0; i--) // This for loop goes backwards (from the end of the clean full file name to the beginning of it)
+				{
+					if ((cleanFullFileName.charAt(i) == '.') && (positionOfLastDot == null))
+						positionOfLastDot = i;
+				}
+				
+				// Copy all of the clean full file name except everything after the last dot (if there was no dot, or if the last dot was a leading dot, everything is copied)
+				if (positionOfLastDot != null && positionOfLastDot != 0)
+				{
+					for (var i = 0; i < positionOfLastDot; i++)
+					{
+						newFullFileName += cleanFullFileName.charAt(i);
+					}
+				}
+				else
+				{
+					newFullFileName += cleanFullFileName;
+				}
+				
+				// Add on the new file extension
+				newFullFileName += "." + newFileExtension;
+			}
+			else
+			{
+				newFullFileName = cleanFullFileName;
+			}
+			
+			// Replace the old full file name with the new one
+			document.getElementById("nameField").value = newFullFileName;
+			if (tabNum == currentTab)
+			{
+				setArraysAccordingToFields(tabNum);
+			}
+		}
+		
+		function createTab(name, contentType, content)
+		{
+			// Allows parameters to be undefined; sets variables with default values if they are undefined
+			if (name == undefined)
+				name = defaultName;
+			if (contentType == undefined)
+				contentType = defaultContentType;
+			if (content == undefined)
+				content = defaultContent;
+			
+			var accesskeyAttribute = "";
+			
+			tabsOpen++;
+			
+			// Prepare arrays with values given for the new tab (or default, if value was not given)
+			nameFieldValues.push(name);
+			contentTypeFieldValues.push(contentType);
+			contentFieldValues.push(content);
+			saveHistories.push([]);
+			
+			// Prepares to give the tab button an accesskey attribute (1-9) if applicable 
+			if (tabsOpen <= 9)
+			{
+				accesskeyAttribute = "accesskey=\"" + tabsOpen + "\"";
+			}
+			
+			/*
+			The next line of code creates <input id="tabButton[tabNum]" type="button" [accesskeyAttribute] onclick="switchToTab([tabNum]);">
+			
+			Example--If it is creating the 4th tab (3rd in programmer counting), this will be the output:
+			<input id="tabButton3" type="button" value="[fileName]" accesskey="4" onclick="switchToTab(3);">
+			*/
+			document.getElementById("tabButtonContainer").innerHTML += "<input id=\"tabButton" + (tabsOpen - 1).toString() + "\" type=\"button\" value=\"" + nameFieldValues[(tabsOpen - 1)] + "\" " + accesskeyAttribute + " onclick=\"switchToTab(" + (tabsOpen - 1).toString() + ");\">";
+			
+			/*
+			If no other tabs are open, switch to only tab
+			This makes sure that a tab is selected when the program loads fresh
+			*/
+			if (tabsOpen == 1)
+			{
+				setFieldsAccordingToArrays();
+				switchToTab(0);
+			}
+		}
+		
+		function switchToTab(tabNum)
+		{
+			// Save field values for previous tab, then load new field values for current tab
+			setArraysAccordingToFields();
+			currentTab = tabNum;
+			setFieldsAccordingToArrays();
+			
+			// Clear displayed file save history
+			document.getElementById("oldSavesHeader").innerHTML = "";
+			document.getElementById("oldSaves").innerHTML = "";
+			
+			// Reset the content type dropdown (change the selected value to blank)
+			document.getElementById("blankContentTypeOption").selected = "selected";
+		}
+		
+		
+		function save(tabNum)
+		{
+			// Allows no parameters to given and defaults to the current tab; if current tab is undefined, defaults to 0
+			if (tabNum == undefined)
+			{
+				if (currentTab == undefined)
+					tabNum = 0;
+				else
+					tabNum = currentTab;
+			}
+			
+			// Get all the file characteristics from the page
+			setArraysAccordingToFields();
+			var name = nameFieldValues[tabNum];
+			var contentType = contentTypeFieldValues[tabNum];
+			var content = contentFieldValues[tabNum];
+			
+			// Assign a URL to the current Blob
+			var contentBlob = new Blob([content], {type: contentType});
+			var blobURL = URL.createObjectURL(contentBlob);
+			
+			// Use Blob's URL in save button; make save button start a download instead of opening
+			var saveButton = document.getElementById("saveButton");
+			saveButton.href = blobURL;
+			saveButton.download = name;
+			
+			// Add current save to save history
+			saveHistories[tabNum].push(blobURL);
+		}
+		
+		function load(file)
+		{
+			// Allows no parameters to given and defaults to the file specified on page
+			if (file == undefined)
+				file = document.getElementById("openButton").files[0];
+			
+			var reader = new FileReader();
+			reader.readAsText(file, "UTF-8");
+			
+			// Wait to finish reading the file before printing the files contents
+			reader.onload = function()
+			{
+				setArraysAccordingToFields();
+				document.getElementById("contentField").value = reader.result;
+			};
+		}
+		
+		function showOldSaves(tabNum)
+		{
+			// Allows no parameters to given and defaults to the current tab; if current tab is undefined, defaults to 0
+			if (tabNum == undefined)
+			{
+				if (currentTab == undefined)
+					tabNum = 0;
+				else
+					tabNum = currentTab;
+			}
+			
+			// Reset displayed save history
+			document.getElementById("oldSavesHeader").innerHTML = "<br>Links to old saves:";
+			document.getElementById("oldSaves").innerHTML = "";
+			
+			// Print save history on screen
+			for (var i = 0; i < saveHistories[tabNum].length; i++)
+			{
+				// Creates <br><li><a href="[link]" target="blank">[link]</a></li>
+				document.getElementById("oldSaves").innerHTML += "<br>";
+				document.getElementById("oldSaves").innerHTML += "<li><a href=\"" + saveHistories[tabNum][i].toString() + "\"target=\"_blank\" \">" + saveHistories[tabNum][i].toString() + "</a></li>";
+			}
+		}
+		
+		function showContentTypes()
+		{
+			document.getElementById("contentTypeSelector").innerHTML = "<option id=\"blankContentTypeOption\" selected=\"selected\" disabled=\"disabled\" hidden=\"hidden\"></option>";
+			
+			for (var i = 0; i < contentTypes.length; i++)
+			{
+				// Creates <option value="[contentType]">[purpose]</option>
+				document.getElementById("contentTypeSelector").innerHTML += "<option value=\"" + contentTypes[i][0] + "\">" + contentTypes[i][2] + "</option>";
+			}
+		}
+	</script>
+</head>
+<body onload="showContentTypes(); createTab();">
+	<div id="tabBanner">
+		<span id="tabButtonContainer">
+			<!--This is where all the tab buttons will go-->
+		</span>
+		<input id="newTabButton" type="button" value="+" accesskey="n" onclick="createTab();">
+	</div>
+	
+	<div id="tabContainer">
+		<div id="tabHeader">
+			<!--Name container-->
+			<span class="fieldBox" style="margin-left: 0px;">
+				<label for="nameField" class="fieldBoxLabel">File Na<u>m</u>e</label>
+				<input id="nameField" type="text" accesskey="m">
+			</span>
+			<!--Content type container-->
+			<span class="fieldBox">
+				<label for="contentTypeField" class="fieldBoxLabel"><u>C</u>ontent Type</label>
+				<input id="contentTypeField" type="text" accesskey="c">
+				<select id="contentTypeSelector" accesskey="c" onchange="setArraysAccordingToFields(); setContentTypeAccordingToDropdown();">
+					<!--This is where all the content type options will go-->
+				</select>
+			</span>
+			<!--Save button container-->
+			<span class="fieldBox">
+				<a id="saveButton" accesskey="s" onclick="save();"><input type="button" value="Save"></a>
+			</span>
+			<!--Open file container-->
+			<span class="fieldBox">
+				<label for="openButton" class="fieldBoxLabel"><u>O</u>pen File</label>
+				<input id="openButton" type="file" accesskey="o" onchange="load();">
+			</span>
+			<!--Recover old saves container-->
+			<span class="fieldBox" style="margin-right: 0px;">
+				<input id="recoverButton" type="button" value="Recover Old Saves" accesskey="r" onclick="showOldSaves();">
+			</span>
+		</div>
+		
+		<textarea id="contentField" style="width: 100%; height: 500px;" accesskey="e"></textarea>
+		<br>
+		<div id="oldSavesContainer"><div id="oldSavesHeader"></div><ul id="oldSaves"></ul></div>
+	</div>
+</body>
+</html>
